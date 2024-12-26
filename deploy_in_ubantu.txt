@@ -1,0 +1,295 @@
+cheack port in use
+
+prerequiteies of deployment PORT
+sudo ss -tulnp    # Show all listening TCP and UDP ports with process names and PIDs
+sudo lsof -i -P -n | grep LISTEN    # List all listening ports and associated processes
+sudo ss -tulnp | grep :5000    # Display processes listening on port 8000 with socket details (TCP/UDP, PID, program name)
+sudo lsof -i :5000             # List open files and processes using port 8000
+sudo ufw status                      # Check firewall status
+sudo ufw allow 5000                  # Allow traffic on port 5000 (for both IPv4 and IPv6)
+sudo ufw deny 5000  # Replace <port_number> with the port you want to block
+sudo ufw allow 8000/tcp         # Allow TCP traffic on port 8000 for both IPv4 and IPv6
+sudo ufw allow 8000/udp         # Allow UDP traffic on port 8000 for both IPv4 and IPv6
+sudo ufw enable                 # Enable the UFW firewall if not already enabled
+sudo ufw allow 8000/tcp         # Allow TCP traffic on port 8000 (used for most web applications)
+sudo ufw allow 8000/udp         # Allow UDP traffic on port 8000 (used for fast, connectionless services)
+sudo ufw allow 8000             # Allow both TCP and UDP traffic on port 8000
+sudo ufw allow proto icmp       # Allow ICMP traffic (used for network diagnostics like ping)
+sudo ufw allow from <IP>        # Allow traffic from a specific IP address
+sudo ufw deny <port_number>     # Deny traffic on a specific port
+sudo ufw allow 80/tcp        # Allow HTTP traffic (port 80)
+sudo ufw allow 443/tcp       # Allow HTTPS traffic (port 443)
+sudo ufw allow 5000/tcp      # Allow custom app port (8000) traffic
+sudo ufw allow from <IP> to any port 3306  # Allow MySQL access from specific IP
+sudo ufw allow from <Internal_IP> to any port 6379  # Allow Redis access from internal network
+
+Note aboutport
+IPv4 is the traditional internet protocol most networks still use, identified by addresses like 192.168.x.x.
+IPv6 is a newer version designed to replace IPv4 and has a much larger address space, using addresses like 2001:0db8::.
+TCP: Transmission Control Protocol, used for reliable communication (e.g., HTTP, FTP).
+UDP: User Datagram Protocol, used for faster, connectionless communication (e.g., DNS, streaming).
+ICMP: Internet Control Message Protocol, used for network error reporting and diagnostics (e.g., ping).
+
+user and group
+cut -d: -f1 /etc/passwd         # List all users by reading /etc/passwd file
+awk -F: '$6 ~ /\/home/ {print $1}' /etc/passwd  # List users with a home directory
+getent passwd                    # Retrieve users from the system's database
+compgen -u                        # List all users using the Bash built-in compgen command
+sudo userdel <username>         # Delete a user without removing their home directory
+sudo userdel -r ocr_version2      # Delete a user and remove their home directory
+sudo userdel -f <username>      # Forcefully delete a user (even if logged in)
+sudo getent passwd | grep ocr_version2  # Verify if a user is deleted by checking /etc/passwd
+sudo groupadd aro_ocr_v_0       # Create a new group
+sudo useradd -m -g aro_ocr_v_0 ocr_llm  # Create a new user and assign them to the group
+sudo passwd ocr_llm           # Set a password for the new user
+id ocr_llm                     # Verify the user and group details
+cat /etc/group                    # View the list of all groups and their details
+sudo chown -R ocr_llm:aro_ocr_v_0 /var/www/app  # Changes ownership of /var/www/app and its contents to user 'username' and group 'username' recursively
+sudo chown -R root:root /var/www/app  # Changes ownership of /var/www/app and its contents back to the root user and root group
+sudo chmod -R 755 /home/ocr_llm   # Recursively sets permissions for all files and
+ls -l /home/ocr_llm  # Displays the permissions, owner, and group of the specified file or directory
+(there are no files or directories in the specified location)
+sudo usermod -s /bin/bash ocr_llm # Sets the shell for the ocr_llm user to /bin/bash if it was missing or invalid.
+sudo chmod -R 755 /var/www/app
+
+Note on User and group
+When a group is created using groupadd, it is stored in the system’s /etc/group file, not in a physical directory.
+The user's home directory is created in /home/<username> by default when using useradd -m. The group doesn't have a home directory;
+it serves as a logical construct for managing user access and permissions.
+For web applications: Use /var/www to align with web server conventions.
+For private or user-specific apps: Use /home/user if you want to manage permissions yourself and are not serving files via a web server.
+
+folder structure
+/var/www/app/
+    ├── app.py
+    ├── wsgi.py
+    ├── folder1/
+    ├── folder2/
+    └── file.txt
+
+
+now final configuration
+
+Configure WSGI (Gunicorn): First, configure Gunicorn to serve your application.
+Gunicorn acts as the bridge between your Python app and the web server (Nginx).
+Ensure that your app runs correctly using Gunicorn.
+
+Configure systemd: Next, set up a systemd service to run Gunicorn as a background service.
+This ensures that Gunicorn starts with your server and can be managed easily.
+
+Configure Nginx: Finally, configure Nginx to act as a reverse proxy.
+Nginx handles incoming HTTP requests, and forwards them to Gunicorn, which processes them with your app.
+
+
+
+Configure WSGI (Gunicorn)
+
+ps aux | grep gunicorn # Lists all processes related to Gunicorn and its PID.
+pgrep -fl gunicorn # Shows Gunicorn process details if running.
+sudo systemctl status app # Displays the status of the Gunicorn service (myapp).
+ss -tuln | grep 5000 # Verifies if Gunicorn is listening on port 8000 (replace with your port).
+netstat -tuln | grep 5000 # Checks if Gunicorn is listening on port 8000.
+sudo journalctl -u app # Displays logs for the Gunicorn service (myapp).
+sudo systemctl stop app # Stops the Gunicorn service named myapp (replace with your service name).
+ps aux | grep gunicorn # Finds the process ID (PID) of Gunicorn.
+kill <PID> # Terminates the Gunicorn process using its PID (replace <PID> with the actual ID).
+sudo pkill gunicorn # Kills all running Gunicorn processes.
+
+install python pakage not virtual env
+If you install as root (globally), it should be accessible to all users, but the user might still need the appropriate permissions.
+If the user needs it in their environment specifically, they should install it themselves using --user or within a virtual environment.
+
+pip3 install --user gunicorn
+sudo chown -R ocr_llm:aro_ocr_v_0 /root/.local/lib/python3.8/site-packages (if nessary)
+python3 -m site --user-site
+
+create wsgi.py
+su - ocr_llm (optional)
+cd /var/www/app 
+gunicorn --workers 3 --bind 0.0.0.0:5000 wsgi:app
+nohup gunicorn --workers 3 --bind 0.0.0.0:5000 wsgi:app & (run in back gground but not recomended)
+
+Note of guinicorn 
+gunicorn: Starts the Gunicorn server, which serves Python web applications (Flask, Django) via WSGI.
+workers 3: Specifies that Gunicorn should use 3 worker processes to handle incoming requests.
+bind 0.0.0.0:5000: Binds the server to all available network interfaces (0.0.0.0) on port 5000, making it accessible to all devices on the network.
+wsgi:app: Points to the WSGI application in the wsgi.py file and uses the app object, which is the Flask or Django app to be served.
+
+
+Configure systemd
+Create a Systemd Service File
+sudo nano /etc/systemd/system/app.service
+
+#############
+[Unit]
+Description=Gunicorn instance to serve my Flask app
+After=network.target
+
+[Service]
+User=ocr_llm
+Group=aro_ocr_v_0
+WorkingDirectory=/var/www/app
+ExecStart=/usr/local/bin/gunicorn --workers 3 --bind 0.0.0.0:5000 wsgi:app
+Restart=on-failure  # Automatically restarts the service if it fails
+
+[Install]
+WantedBy=multi-user.target
+################
+
+sudo systemctl daemon-reload  # Reload systemd to recognize the new or updated service file.
+sudo systemctl start app.service  # Start the service manually.
+sudo systemctl stop app.service  # Stop the running service.
+sudo systemctl restart app.service  # Restart the service.
+sudo systemctl enable app.service  # Enable the service to start on system boot.
+sudo systemctl disable app.service  # Disable the service from starting on system boot.
+sudo systemctl status app.service  # Check the current status of the service.
+journalctl -u app.service  # View the logs for the service.
+sudo systemctl reload app.service  # Reload the service configuration without stopping it.
+
+Note of systemd
+systemd is important because it manages and controls system services and processes on modern Linux distributions. In short:
+Service Management: Easily start, stop, restart, and monitor services.
+Automatic Startup: Ensures services automatically start on boot.
+Reliability: Restarts services automatically on failure.
+Logging: Provides centralized logging for easier troubleshooting.
+Dependency Management: Handles the order in which services start based on dependencies.
+
+
+Configure Nginx
+nginx -v
+sudo systemctl status nginx
+sudo netstat -tuln | grep ':80'
+sudo systemctl start nginx
+sudo systemctl stop nginx
+sudo systemctl restart nginx
+sudo systemctl enable nginx
+sudo systemctl disable nginx
+
+
+sudo nano /etc/nginx/sites-available/default
+##########################
+upstream myapp_backend {
+    least_conn;  # Use the least connections load balancing strategy
+    server 127.0.0.1:5000;  # First Gunicorn instance
+    server 127.0.0.1:5001;  # Second Gunicorn instance
+}
+
+server {
+    listen 80;
+
+    server_name 164.52.197.79;  # Define your server's public IP or domain name
+
+    location / {
+        proxy_pass http://myapp_backend;  # Send requests to the upstream backend
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+########################################
+sudo chown root:root /etc/nginx/nginx.conf
+sudo chmod 644 /etc/nginx/nginx.conf
+
+sudo nginx -t #Test Nginx configuration:
+sudo systemctl reload nginx
+sudo systemctl status nginx
+sudo systemctl stop nginx
+
+Note Nginx
+No need to create anything by the name of myapp_backend: The name myapp_backend is only a label in the Nginx configuration.
+proxy_pass http://myapp_backend;: This simply means, "Forward the incoming request to one of the backend servers defined in the 
+upstream block named myapp_backend.
+
+three file need to be there (app ,defult and inginx.config)
+two are automatically created need to create app 
+you can deploy multiple APIs running on different ports under a single Nginx configuration. 
+You just need to define different locations in the Nginx server block, 
+and each location can proxy requests to different backend services
+Example
+######################
+# Define upstreams (backend servers for each API)
+upstream api1_backend {
+    least_conn;  # Load balancing strategy
+    server 127.0.0.1:5000;  # First API running on port 5000
+}
+
+upstream api2_backend {
+    least_conn;  # Load balancing strategy
+    server 127.0.0.1:5001;  # Second API running on port 5001
+}
+
+upstream api3_backend {
+    least_conn;  # Load balancing strategy
+    server 127.0.0.1:5002;  # Third API running on port 5002
+}
+
+server {
+    listen 80;  # HTTP port for the API
+
+    server_name 164.52.197.79;  # Public IP or domain name
+
+    # Root directory for static files
+    root /var/www/html;  # Adjust according to your static files location
+    index index.html index.htm;
+
+    # Location for the first API (on port 5000)
+    location /api1/ {
+        proxy_pass http://api1_backend;  # Forward requests to the first API
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Location for the second API (on port 5001)
+    location /api2/ {
+        proxy_pass http://api2_backend;  # Forward requests to the second API
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Location for the third API (on port 5002)
+    location /api3/ {
+        proxy_pass http://api3_backend;  # Forward requests to the third API
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+##################################
+
+#logging and monitoring (need to configure in script)###
+
+# Create the log directory for Gunicorn
+sudo mkdir -p /var/log/gunicorn
+
+# Set ownership of the directory to the www-data user (or replace with your user if different)
+sudo chown -R ocr_llm:aro_ocr_v_0 /var/log/gunicorn
+
+# Restart Gunicorn service (if running via systemd)
+sudo systemctl restart app.service
+
+# If running Gunicorn manually, restart it with log file options
+gunicorn --access-logfile /var/log/gunicorn/access.log --error-logfile /var/log/gunicorn/error.log --log-level info app:app
+
+# Verify if the log directory has correct permissions
+ls -ld /var/log/gunicorn
+
+# View the latest error logs in real-time
+tail -f /var/log/gunicorn/error.log
+
+
+
+Gunicorn: Monitor worker status, memory, CPU usage, request duration, and access/error logs.
+Nginx: Track request throughput, error rates, response times, access logs, and error logs.
+WSGI: Ensure smooth communication between Nginx and Gunicorn, logging connection issues.
+
+
+sudo journalctl -u app.service 
+sudo journalctl -u nginx
+sudo netstat -tulnp
+
