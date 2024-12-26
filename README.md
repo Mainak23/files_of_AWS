@@ -11,9 +11,6 @@ This repository provides a comprehensive guide to selecting the best AWS EC2 ins
 - **Automation**: Scripts and configurations for automating instance setup and deployment.
 - **Optimization Tips**: Best practices for performance, cost-efficiency, and security.
 
----
-
-## Getting Started
 
 ### Prerequisites
 
@@ -23,15 +20,8 @@ This repository provides a comprehensive guide to selecting the best AWS EC2 ins
 
 ### Clone the Repository
 ```bash
-git clone <repository-url>
-cd aws-instance-deployment
-```
+git clone https://github.com/Mainak23/files_of_AWS.git
 
-### 1. Selecting the Best Instance Type
-Use the `instance-selector` script to determine the optimal instance type for your workload:
-```bash
-python3 instance_selector.py --workload <workload-type> --region <region>
-```
 - **Workload Types**:
   - `general`: General-purpose workloads.
   - `compute`: High-performance computing.
